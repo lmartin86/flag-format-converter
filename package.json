@@ -1,0 +1,9 @@
+{
+  "name": "flag-format-converter",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Converts feature flag definitions between LaunchDarkly's file-source format and Unleash's bootstrap format.",
+  "type": "module",
+  "main": "src/cli.ts",
+  "license": "MIT"
+}
