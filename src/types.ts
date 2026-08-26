@@ -21,11 +21,27 @@ export interface UnleashStrategy {
   parameters: Record<string, string>;
 }
 
+// The payload carries a multivariate flag's served value. Unleash also
+// supports a "json" and "csv" payload type; those have no LD variation
+// type to land on, so the converter doesn't produce or accept them.
+export interface UnleashVariantPayload {
+  type: string;
+  value: string;
+}
+
+export interface UnleashVariant {
+  name: string;
+  weight: number;
+  weightType?: string;
+  payload?: UnleashVariantPayload;
+}
+
 export interface UnleashFeature {
   name: string;
   description?: string;
   enabled: boolean;
   strategies: UnleashStrategy[];
+  variants?: UnleashVariant[];
 }
 
 export interface UnleashBootstrap {
