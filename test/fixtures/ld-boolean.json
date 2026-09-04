@@ -1,0 +1,16 @@
+{
+  "new-checkout-flow": {
+    "key": "new-checkout-flow",
+    "on": true,
+    "variations": [true, false],
+    "fallthrough": { "variation": 0 },
+    "offVariation": 1
+  },
+  "legacy-search": {
+    "key": "legacy-search",
+    "on": false,
+    "variations": [true, false],
+    "fallthrough": { "variation": 0 },
+    "offVariation": 1
+  }
+}

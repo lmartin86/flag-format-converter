@@ -1,0 +1,9 @@
+{
+  "checkout-theme": {
+    "key": "checkout-theme",
+    "on": true,
+    "variations": ["premium"],
+    "fallthrough": { "variation": 0 },
+    "offVariation": 0
+  }
+}

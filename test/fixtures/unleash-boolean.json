@@ -1,0 +1,15 @@
+{
+  "version": 2,
+  "features": [
+    {
+      "name": "new-checkout-flow",
+      "enabled": true,
+      "strategies": [{ "name": "default", "parameters": {} }]
+    },
+    {
+      "name": "legacy-search",
+      "enabled": false,
+      "strategies": [{ "name": "default", "parameters": {} }]
+    }
+  ]
+}

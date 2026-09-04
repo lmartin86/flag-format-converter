@@ -88,5 +88,7 @@ in the LD schema.
 - `src/types.ts` — the subset of each format this tool understands
 - `src/convert.ts` — the two conversion functions
 - `src/cli.ts` — file-in, file-out command line wrapper
+- `test/` — fixture-based conversion tests, run with `npm test` (uses
+  Node's built-in test runner, no extra tooling)
 
 No third-party dependencies. Standard library only.

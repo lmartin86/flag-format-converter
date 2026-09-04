@@ -1,0 +1,18 @@
+{
+  "version": 2,
+  "features": [
+    {
+      "name": "checkout-theme",
+      "enabled": true,
+      "strategies": [{ "name": "default", "parameters": {} }],
+      "variants": [
+        {
+          "name": "premium",
+          "weight": 1000,
+          "weightType": "variable",
+          "payload": { "type": "string", "value": "premium" }
+        }
+      ]
+    }
+  ]
+}

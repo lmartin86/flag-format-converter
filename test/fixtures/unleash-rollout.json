@@ -1,0 +1,24 @@
+{
+  "version": 2,
+  "features": [
+    {
+      "name": "signup-button-color",
+      "enabled": true,
+      "strategies": [{ "name": "default", "parameters": {} }],
+      "variants": [
+        {
+          "name": "red",
+          "weight": 600,
+          "weightType": "variable",
+          "payload": { "type": "string", "value": "red" }
+        },
+        {
+          "name": "blue",
+          "weight": 400,
+          "weightType": "variable",
+          "payload": { "type": "string", "value": "blue" }
+        }
+      ]
+    }
+  ]
+}

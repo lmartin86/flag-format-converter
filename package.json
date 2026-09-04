@@ -5,5 +5,8 @@
   "description": "Converts feature flag definitions between LaunchDarkly's file-source format and Unleash's bootstrap format.",
   "type": "module",
   "main": "src/cli.ts",
+  "scripts": {
+    "test": "node --experimental-strip-types --test test/*.test.ts"
+  },
   "license": "MIT"
 }

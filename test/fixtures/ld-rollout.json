@@ -1,0 +1,16 @@
+{
+  "signup-button-color": {
+    "key": "signup-button-color",
+    "on": true,
+    "variations": ["red", "blue"],
+    "fallthrough": {
+      "rollout": {
+        "variations": [
+          { "variation": 0, "weight": 60000 },
+          { "variation": 1, "weight": 40000 }
+        ]
+      }
+    },
+    "offVariation": 0
+  }
+}
