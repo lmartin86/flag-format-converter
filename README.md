@@ -50,6 +50,13 @@ node --experimental-strip-types src/cli.ts --to ld flags-unleash.json flags-ld.j
 (Or compile first with `tsc` and run the output in `dist/`. Any TypeScript
 toolchain works; this repo doesn't pin one.)
 
+Either path can be omitted or given as `-` to use stdin/stdout instead,
+so the tool can sit in a pipeline:
+
+```
+curl https://example/flags.json | node --experimental-strip-types src/cli.ts --to unleash > flags-unleash.json
+```
+
 ### LaunchDarkly input
 
 ```json
