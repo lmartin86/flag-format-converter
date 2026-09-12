@@ -100,44 +100,41 @@ function rolloutFeature(key: string, outcomes: { value: unknown; weight: number 
   };
 }
 
-export function ldToUnleash(flags: LDFlagSet): UnleashBootstrap {
-  const features: UnleashFeature[] = [];
-
-  for (const [key, flag] of Object.entries(flags)) {
-    if (hasTargetingRules(flag)) {
-      throw new UnsupportedFlagError(`flag "${key}" has targeting rules, which this converter doesn't support yet`);
-    }
-    if (!isBooleanPair(flag) && !isHomogeneousMultivariate(flag)) {
-      throw new UnsupportedFlagError(`flag "${key}" has variations this converter doesn't support yet`);
-    }
-
-    const outcomes = flag.on ? rolloutOutcomes(flag) : undefined;
-    if (outcomes) {
-      features.push(rolloutFeature(key, outcomes));
-      continue;
-    }
-
-    const served = servedVariation(key, flag);
-    if (isBooleanPair(flag)) {
-      features.push({
-        name: key,
-        enabled: served === true,
-        strategies: [{ name: "default", parameters: {} }],
-      });
-      continue;
-    }
-
-    // Carried as a single full-weight variant rather than one variant per
-    // declared LD variation, since without a rollout the others can never
-    // actually be reached.
-    features.push({
-      name: key,
-      enabled: flag.on,
-      strategies: [{ name: "default", parameters: {} }],
-      variants: [toVariant(served, 1000)],
-    });
+function convertLdFlag(key: string, flag: LDFlag): UnleashFeature {
+  if (hasTargetingRules(flag)) {
+    throw new UnsupportedFlagError(`flag "${key}" has targeting rules, which this converter doesn't support yet`);
+  }
+  if (!isBooleanPair(flag) && !isHomogeneousMultivariate(flag)) {
+    throw new UnsupportedFlagError(`flag "${key}" has variations this converter doesn't support yet`);
   }
 
+  const outcomes = flag.on ? rolloutOutcomes(flag) : undefined;
+  if (outcomes) {
+    return rolloutFeature(key, outcomes);
+  }
+
+  const served = servedVariation(key, flag);
+  if (isBooleanPair(flag)) {
+    return {
+      name: key,
+      enabled: served === true,
+      strategies: [{ name: "default", parameters: {} }],
+    };
+  }
+
+  // Carried as a single full-weight variant rather than one variant per
+  // declared LD variation, since without a rollout the others can never
+  // actually be reached.
+  return {
+    name: key,
+    enabled: flag.on,
+    strategies: [{ name: "default", parameters: {} }],
+    variants: [toVariant(served, 1000)],
+  };
+}
+
+export function ldToUnleash(flags: LDFlagSet): UnleashBootstrap {
+  const features = Object.entries(flags).map(([key, flag]) => convertLdFlag(key, flag));
   return { version: 2, features };
 }
 
@@ -154,72 +151,110 @@ function unleashVariantToLdValue(feature: UnleashFeature, variant: UnleashVarian
   );
 }
 
-export function unleashToLd(bootstrap: UnleashBootstrap): LDFlagSet {
-  const out: LDFlagSet = {};
+function convertUnleashFeature(feature: UnleashFeature): LDFlag {
+  // A single default strategy with no parameters is Unleash's "on
+  // for everyone" case, which maps cleanly onto LD's boolean/rollout-
+  // free flags. Any other strategy (gradual rollout, user IDs, IP
+  // allowlists) has no equivalent here, so it's out of scope for now.
+  const hasOnlyDefaultStrategy =
+    feature.strategies.length <= 1 &&
+    feature.strategies.every((s) => s.name === "default" && Object.keys(s.parameters).length === 0);
 
-  for (const feature of bootstrap.features) {
-    // A single default strategy with no parameters is Unleash's "on
-    // for everyone" case, which maps cleanly onto LD's boolean/rollout-
-    // free flags. Any other strategy (gradual rollout, user IDs, IP
-    // allowlists) has no equivalent here, so it's out of scope for now.
-    const hasOnlyDefaultStrategy =
-      feature.strategies.length <= 1 &&
-      feature.strategies.every((s) => s.name === "default" && Object.keys(s.parameters).length === 0);
-
-    if (!hasOnlyDefaultStrategy) {
-      throw new UnsupportedFlagError(
-        `feature "${feature.name}" uses a non-default strategy, which this converter doesn't support yet`,
-      );
-    }
-
-    if (!feature.variants || feature.variants.length === 0) {
-      out[feature.name] = {
-        key: feature.name,
-        on: feature.enabled,
-        variations: [true, false],
-        fallthrough: { variation: 0 },
-        offVariation: 1,
-      };
-      continue;
-    }
-
-    const values = feature.variants.map((v) => unleashVariantToLdValue(feature, v));
-
-    if (feature.variants.length === 1) {
-      // Unleash has no notion of an "off" value the way LD's offVariation
-      // does, so the single known value is used for both fallthrough and
-      // off. That's a best-effort reconstruction, not a lossless round trip.
-      out[feature.name] = {
-        key: feature.name,
-        on: feature.enabled,
-        variations: values,
-        fallthrough: { variation: 0 },
-        offVariation: 0,
-      };
-      continue;
-    }
-
-    // Several weighted variants is Unleash's way of splitting traffic,
-    // which maps onto an LD rollout. LD still needs a single fixed
-    // offVariation for when the flag is off, and Unleash has nothing to
-    // pick that from, so the heaviest variant is used as a best guess.
-    const rolloutVariations: LDRolloutVariation[] = feature.variants.map((v, i) => ({
-      variation: i,
-      weight: unleashWeightToLdWeight(v.weight),
-    }));
-    const heaviestIndex = feature.variants.reduce(
-      (best, v, i) => (v.weight > feature.variants![best].weight ? i : best),
-      0,
+  if (!hasOnlyDefaultStrategy) {
+    throw new UnsupportedFlagError(
+      `feature "${feature.name}" uses a non-default strategy, which this converter doesn't support yet`,
     );
+  }
 
-    out[feature.name] = {
+  if (!feature.variants || feature.variants.length === 0) {
+    return {
       key: feature.name,
       on: feature.enabled,
-      variations: values,
-      fallthrough: { rollout: { variations: rolloutVariations } },
-      offVariation: heaviestIndex,
+      variations: [true, false],
+      fallthrough: { variation: 0 },
+      offVariation: 1,
     };
   }
 
+  const values = feature.variants.map((v) => unleashVariantToLdValue(feature, v));
+
+  if (feature.variants.length === 1) {
+    // Unleash has no notion of an "off" value the way LD's offVariation
+    // does, so the single known value is used for both fallthrough and
+    // off. That's a best-effort reconstruction, not a lossless round trip.
+    return {
+      key: feature.name,
+      on: feature.enabled,
+      variations: values,
+      fallthrough: { variation: 0 },
+      offVariation: 0,
+    };
+  }
+
+  // Several weighted variants is Unleash's way of splitting traffic,
+  // which maps onto an LD rollout. LD still needs a single fixed
+  // offVariation for when the flag is off, and Unleash has nothing to
+  // pick that from, so the heaviest variant is used as a best guess.
+  const rolloutVariations: LDRolloutVariation[] = feature.variants.map((v, i) => ({
+    variation: i,
+    weight: unleashWeightToLdWeight(v.weight),
+  }));
+  const heaviestIndex = feature.variants.reduce(
+    (best, v, i) => (v.weight > feature.variants![best].weight ? i : best),
+    0,
+  );
+
+  return {
+    key: feature.name,
+    on: feature.enabled,
+    variations: values,
+    fallthrough: { rollout: { variations: rolloutVariations } },
+    offVariation: heaviestIndex,
+  };
+}
+
+export function unleashToLd(bootstrap: UnleashBootstrap): LDFlagSet {
+  const out: LDFlagSet = {};
+  for (const feature of bootstrap.features) {
+    out[feature.name] = convertUnleashFeature(feature);
+  }
   return out;
+}
+
+// One flag/feature that can't be represented on the other side, with the
+// same message ldToUnleash/unleashToLd would throw for it. Collected
+// rather than thrown so a validate pass can report every offender in one
+// run instead of stopping at the first.
+export interface UnsupportedFlag {
+  key: string;
+  reason: string;
+}
+
+function collectUnsupported<T>(items: T[], convert: (item: T) => void, keyOf: (item: T) => string): UnsupportedFlag[] {
+  const unsupported: UnsupportedFlag[] = [];
+  for (const item of items) {
+    try {
+      convert(item);
+    } catch (err) {
+      if (!(err instanceof UnsupportedFlagError)) throw err;
+      unsupported.push({ key: keyOf(item), reason: err.message });
+    }
+  }
+  return unsupported;
+}
+
+export function findUnsupportedLdFlags(flags: LDFlagSet): UnsupportedFlag[] {
+  return collectUnsupported(
+    Object.entries(flags),
+    ([key, flag]) => convertLdFlag(key, flag),
+    ([key]) => key,
+  );
+}
+
+export function findUnsupportedUnleashFeatures(bootstrap: UnleashBootstrap): UnsupportedFlag[] {
+  return collectUnsupported(
+    bootstrap.features,
+    (feature) => convertUnleashFeature(feature),
+    (feature) => feature.name,
+  );
 }

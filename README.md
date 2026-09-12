@@ -57,6 +57,14 @@ so the tool can sit in a pipeline:
 curl https://example/flags.json | node --experimental-strip-types src/cli.ts --to unleash > flags-unleash.json
 ```
 
+Pass `--validate-only` to check which flags the converter can't handle
+without writing any output. It walks every flag, reports every
+unsupported one (not just the first), and exits non-zero if it found any:
+
+```
+node --experimental-strip-types src/cli.ts --to unleash --validate-only flags-ld.json
+```
+
 ### LaunchDarkly input
 
 ```json

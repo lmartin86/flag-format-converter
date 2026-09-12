@@ -1,10 +1,17 @@
 #!/usr/bin/env node
 import { readFileSync, writeFileSync } from "node:fs";
-import { ldToUnleash, unleashToLd, UnsupportedFlagError } from "./convert.js";
+import {
+  findUnsupportedLdFlags,
+  findUnsupportedUnleashFeatures,
+  ldToUnleash,
+  unleashToLd,
+  UnsupportedFlagError,
+} from "./convert.js";
 import type { LDFlagSet, UnleashBootstrap } from "./types.js";
 
 function usage(): never {
   console.error("usage: flagconv --to <ld|unleash> [input.json] [output.json]");
+  console.error('       flagconv --to <ld|unleash> --validate-only [input.json]');
   console.error('       "-" or a missing path means stdin (input) or stdout (output)');
   process.exit(1);
 }
@@ -17,6 +24,7 @@ function readStdin(): string {
 
 function main(argv: string[]): void {
   let to: "ld" | "unleash" | undefined;
+  let validateOnly = false;
   const positional: string[] = [];
 
   for (let i = 0; i < argv.length; i++) {
@@ -25,6 +33,8 @@ function main(argv: string[]): void {
       const value = argv[++i];
       if (value !== "ld" && value !== "unleash") usage();
       to = value;
+    } else if (arg === "--validate-only") {
+      validateOnly = true;
     } else {
       positional.push(arg);
     }
@@ -34,9 +44,23 @@ function main(argv: string[]): void {
   if (!to) usage();
 
   const usesStdin = !inputPath || inputPath === "-";
-  const usesStdout = !outputPath || outputPath === "-";
   const raw = usesStdin ? readStdin() : readFileSync(inputPath, "utf8");
   const input = JSON.parse(raw);
+
+  if (validateOnly) {
+    const unsupported =
+      to === "unleash" ? findUnsupportedLdFlags(input as LDFlagSet) : findUnsupportedUnleashFeatures(input as UnleashBootstrap);
+    if (unsupported.length === 0) {
+      console.error("all flags supported");
+      return;
+    }
+    for (const { reason } of unsupported) {
+      console.error(reason);
+    }
+    process.exit(1);
+  }
+
+  const usesStdout = !outputPath || outputPath === "-";
 
   try {
     const result = to === "unleash" ? ldToUnleash(input as LDFlagSet) : unleashToLd(input as UnleashBootstrap);
