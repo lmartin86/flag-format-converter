@@ -151,11 +151,48 @@ function unleashVariantToLdValue(feature: UnleashFeature, variant: UnleashVarian
   );
 }
 
+// Unleash's flexibleRollout gates a feature on/off for a percentage of
+// traffic; its "rollout" parameter is a 0-100 percentage (as a string,
+// decimals allowed). That's a two-outcome split between "on" and "off",
+// which is exactly what an LD rollout across [true, false] expresses, so
+// unlike other non-default strategies this one has a real LD equivalent.
+function flexibleRolloutToLdFlag(feature: UnleashFeature, strategy: UnleashStrategy): LDFlag {
+  if (feature.variants && feature.variants.length > 0) {
+    throw new UnsupportedFlagError(
+      `feature "${feature.name}" combines a flexibleRollout strategy with variants, which this converter doesn't support yet`,
+    );
+  }
+
+  const percent = Number(strategy.parameters.rollout);
+  if (!Number.isFinite(percent) || percent < 0 || percent > 100) {
+    throw new UnsupportedFlagError(
+      `feature "${feature.name}" has a flexibleRollout with an invalid rollout percentage "${strategy.parameters.rollout}"`,
+    );
+  }
+
+  const onWeight = Math.round(percent * 1000);
+  const rolloutVariations: LDRolloutVariation[] = [
+    { variation: 0, weight: onWeight },
+    { variation: 1, weight: 100000 - onWeight },
+  ];
+  return {
+    key: feature.name,
+    on: feature.enabled,
+    variations: [true, false],
+    fallthrough: { rollout: { variations: rolloutVariations } },
+    offVariation: 1,
+  };
+}
+
 function convertUnleashFeature(feature: UnleashFeature): LDFlag {
+  if (feature.strategies.length === 1 && feature.strategies[0].name === "flexibleRollout") {
+    return flexibleRolloutToLdFlag(feature, feature.strategies[0]);
+  }
+
   // A single default strategy with no parameters is Unleash's "on
   // for everyone" case, which maps cleanly onto LD's boolean/rollout-
-  // free flags. Any other strategy (gradual rollout, user IDs, IP
-  // allowlists) has no equivalent here, so it's out of scope for now.
+  // free flags. Any other strategy (user IDs, IP allowlists, ...) has
+  // no equivalent here, so it's out of scope for now.
   const hasOnlyDefaultStrategy =
     feature.strategies.length <= 1 &&
     feature.strategies.every((s) => s.name === "default" && Object.keys(s.parameters).length === 0);

@@ -16,10 +16,21 @@ definition.
 This handles boolean flags (on for everyone, off for everyone) and
 multivariate flags with string or number variations, as long as there's
 no per-user targeting. LaunchDarkly's per-user targeting rules, JSON
-variations, and Unleash's non-default strategies (user ID lists, IP
-allowlists) have no equivalent on the other side, so the converter
-refuses to guess and exits with an error instead of silently dropping
-targeting logic.
+variations, and most of Unleash's non-default strategies (user ID
+lists, IP allowlists) have no equivalent on the other side, so the
+converter refuses to guess and exits with an error instead of silently
+dropping targeting logic.
+
+The one non-default strategy that does have an equivalent is Unleash's
+`flexibleRollout`: its `rollout` parameter is a 0-100 percentage split
+between "on" and "off", which is exactly a two-outcome LD rollout across
+`[true, false]`. Converting that direction produces an LD flag with a
+boolean rollout instead of an error. This only covers `flexibleRollout`
+on its own — a feature that combines it with variants, or with other
+strategies, still isn't supported. There's no equivalent conversion the
+other way: an LD boolean rollout converts to Unleash as weighted
+variants under the "default" strategy (see below), not as a
+`flexibleRollout` strategy.
 
 A percentage rollout — LD's fallthrough splitting traffic across several
 variations by weight — is supported. It maps onto Unleash as a set of

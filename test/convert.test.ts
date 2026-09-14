@@ -98,17 +98,70 @@ test("findUnsupportedLdFlags reports every offending flag without throwing", () 
 
 test("findUnsupportedUnleashFeatures reports every offending feature without throwing", () => {
   const good: UnleashFeature = { name: "good-feature", enabled: true, strategies: [{ name: "default", parameters: {} }] };
-  const gradual: UnleashFeature = {
-    name: "gradual-feature",
+  const targeted: UnleashFeature = {
+    name: "targeted-feature",
     enabled: true,
-    strategies: [{ name: "flexibleRollout", parameters: { rollout: "50" } }],
+    strategies: [{ name: "userWithId", parameters: { userIds: "user-1" } }],
   };
 
-  const unsupported = findUnsupportedUnleashFeatures({ version: 2, features: [good, gradual] });
+  const unsupported = findUnsupportedUnleashFeatures({ version: 2, features: [good, targeted] });
 
   assert.deepEqual(
     unsupported.map((u) => u.key),
-    ["gradual-feature"],
+    ["targeted-feature"],
   );
   assert.match(unsupported[0].reason, /non-default strategy/);
+});
+
+test("flexibleRollout strategy: unleash -> ld two-outcome rollout", () => {
+  const feature: UnleashFeature = {
+    name: "signup-button-color",
+    enabled: true,
+    strategies: [{ name: "flexibleRollout", parameters: { rollout: "60", stickiness: "default", groupId: "signup-button-color" } }],
+  };
+
+  assert.deepEqual(unleashToLd({ version: 2, features: [feature] }), {
+    "signup-button-color": {
+      key: "signup-button-color",
+      on: true,
+      variations: [true, false],
+      fallthrough: { rollout: { variations: [
+        { variation: 0, weight: 60000 },
+        { variation: 1, weight: 40000 },
+      ] } },
+      offVariation: 1,
+    },
+  });
+});
+
+test("flexibleRollout strategy: disabled feature carries through as off", () => {
+  const feature: UnleashFeature = {
+    name: "signup-button-color",
+    enabled: false,
+    strategies: [{ name: "flexibleRollout", parameters: { rollout: "60" } }],
+  };
+
+  const ld = unleashToLd({ version: 2, features: [feature] })["signup-button-color"];
+  assert.equal(ld.on, false);
+});
+
+test("flexibleRollout strategy combined with variants is unsupported", () => {
+  const feature: UnleashFeature = {
+    name: "signup-button-color",
+    enabled: true,
+    strategies: [{ name: "flexibleRollout", parameters: { rollout: "60" } }],
+    variants: [{ name: "red", weight: 1000, payload: { type: "string", value: "red" } }],
+  };
+
+  assert.throws(() => unleashToLd({ version: 2, features: [feature] }), /combines a flexibleRollout strategy with variants/);
+});
+
+test("flexibleRollout strategy with an invalid percentage is unsupported", () => {
+  const feature: UnleashFeature = {
+    name: "signup-button-color",
+    enabled: true,
+    strategies: [{ name: "flexibleRollout", parameters: { rollout: "not-a-number" } }],
+  };
+
+  assert.throws(() => unleashToLd({ version: 2, features: [feature] }), /invalid rollout percentage/);
 });
