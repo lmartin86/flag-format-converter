@@ -11,7 +11,7 @@ import type { LDFlagSet, UnleashBootstrap } from "./types.js";
 
 function usage(): never {
   console.error("usage: flagconv --to <ld|unleash> [input.json] [output.json]");
-  console.error('       flagconv --to <ld|unleash> --validate-only [input.json]');
+  console.error('       flagconv --to <ld|unleash> --validate-only [--summary] [input.json]');
   console.error('       "-" or a missing path means stdin (input) or stdout (output)');
   process.exit(1);
 }
@@ -25,6 +25,7 @@ function readStdin(): string {
 function main(argv: string[]): void {
   let to: "ld" | "unleash" | undefined;
   let validateOnly = false;
+  let summary = false;
   const positional: string[] = [];
 
   for (let i = 0; i < argv.length; i++) {
@@ -35,6 +36,8 @@ function main(argv: string[]): void {
       to = value;
     } else if (arg === "--validate-only") {
       validateOnly = true;
+    } else if (arg === "--summary") {
+      summary = true;
     } else {
       positional.push(arg);
     }
@@ -50,12 +53,17 @@ function main(argv: string[]): void {
   if (validateOnly) {
     const unsupported =
       to === "unleash" ? findUnsupportedLdFlags(input as LDFlagSet) : findUnsupportedUnleashFeatures(input as UnleashBootstrap);
+    const total = to === "unleash" ? Object.keys(input).length : (input as UnleashBootstrap).features.length;
     if (unsupported.length === 0) {
-      console.error("all flags supported");
+      console.error(summary ? `0 of ${total} flags unsupported` : "all flags supported");
       return;
     }
-    for (const { reason } of unsupported) {
-      console.error(reason);
+    if (summary) {
+      console.error(`${unsupported.length} of ${total} flags unsupported: ${unsupported.map((u) => u.key).join(", ")}`);
+    } else {
+      for (const { reason } of unsupported) {
+        console.error(reason);
+      }
     }
     process.exit(1);
   }

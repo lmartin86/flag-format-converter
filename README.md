@@ -76,6 +76,14 @@ unsupported one (not just the first), and exits non-zero if it found any:
 node --experimental-strip-types src/cli.ts --to unleash --validate-only flags-ld.json
 ```
 
+Add `--summary` to get one line with the unsupported count and flag keys
+instead of a full reason per flag, which is easier to scan on a large
+file:
+
+```
+node --experimental-strip-types src/cli.ts --to unleash --validate-only --summary flags-ld.json
+```
+
 ### LaunchDarkly input
 
 ```json

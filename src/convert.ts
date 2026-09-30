@@ -4,6 +4,7 @@ import type {
   LDRolloutVariation,
   UnleashBootstrap,
   UnleashFeature,
+  UnleashStrategy,
   UnleashVariant,
 } from "./types.js";
 
